@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crislio Store</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#090b10;color:#fff;font-family:Inter,Arial,sans-serif}
+header{position:sticky;top:0;z-index:10;background:#10131aeF;border-bottom:1px solid #262c38;backdrop-filter:blur(12px)}
+.nav{max-width:1200px;margin:auto;padding:15px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.logo{font-size:25px;font-weight:900}.logo span{color:#8b63ff}
+.search{flex:1;min-width:240px;background:#181c25;border:1px solid #303746;color:white;border-radius:12px;padding:12px 14px;outline:0}
+main{max-width:1200px;margin:auto;padding:28px 20px}.hero{border:1px solid #292f3c;border-radius:22px;padding:30px;background:linear-gradient(135deg,#161a29,#0e1016);margin-bottom:24px}
+.hero h1{margin:0 0 8px;font-size:40px}.hero p{margin:0;color:#aeb6c5}.status{margin-top:13px;font-size:13px;color:#8f99aa}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}.filter{background:#171b23;color:#dfe4ec;border:1px solid #2b3140;border-radius:10px;padding:9px 13px;cursor:pointer}.filter.active{background:#8b63ff;border-color:#8b63ff}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:16px}.card{overflow:hidden;background:#131720;border:1px solid #272e3a;border-radius:16px}.pic{height:215px;background:radial-gradient(circle at 50% 20%,#2a3040,#12151c);display:flex;align-items:center;justify-content:center}.pic img{width:100%;height:100%;object-fit:cover}.placeholder{color:#778196;font-weight:800;font-size:13px}.info{padding:14px}.name{font-weight:850;min-height:40px}.meta{font-size:12px;color:#8993a5;margin-top:4px}.vb{color:#b8c0ce;font-size:13px;margin-top:7px}.price{font-size:20px;font-weight:900;margin:8px 0}.buy{width:100%;padding:10px;border:0;border-radius:10px;background:#8b63ff;color:white;font-weight:850;cursor:pointer}.buy:hover{filter:brightness(1.1)}
+#loading{padding:30px;text-align:center;color:#9da7b8}.error{padding:18px;background:#20171a;border:1px solid #4a2c33;border-radius:12px;color:#ffb5bf}
+footer{text-align:center;padding:35px 20px;color:#727d90;border-top:1px solid #202631;margin-top:40px}
+.modal{display:none;position:fixed;inset:0;background:#000b;z-index:30;align-items:center;justify-content:center;padding:20px}.box{width:min(440px,100%);background:#151922;border:1px solid #303746;border-radius:18px;padding:22px}.close{float:right;border:0;background:none;color:#aaa;font-size:23px;cursor:pointer}.pay{margin:15px 0;padding:14px;border-radius:12px;background:#0e1117;color:#ccd3df}.wa{display:block;background:#20c56a;color:#fff;text-align:center;text-decoration:none;padding:12px;border-radius:10px;font-weight:900}
+</style>
+</head>
+<body>
+<header><div class="nav"><div class="logo">Cris<span>lio</span> Store</div>
+<input id="search" class="search" placeholder="Buscar en la tienda..."></div></header>
+<main>
+<section class="hero"><h1>🎮 Cris<span style="color:#8b63ff">lio</span> Store</h1>
+<p>Tienda diaria de Fortnite · catálogo automático · precios de prueba S/ 10</p>
+<div id="status" class="status">Cargando tienda actual...</div></section>
+<div class="filters" id="filters"></div>
+<div id="loading">Cargando productos e imágenes reales...</div><div id="grid" class="grid"></div>
+</main>
+<footer>Crislio Store · Tienda independiente · El catálogo se obtiene automáticamente de la tienda diaria</footer>
+
+<div id="modal" class="modal"><div class="box"><button class="close" onclick="closeModal()">×</button>
+<h2 id="mtitle"></h2><p>Precio de prueba: <b>S/ 10.00</b></p>
+<div class="pay">📱 <b>Pago:</b> Yape / Plin<br><small>Antes de publicar la tienda, coloca aquí tu número real.</small></div>
+<a id="wa" class="wa" target="_blank">Contactar por WhatsApp</a></div></div>
+
+<script>
+const API="https://fortnite-api.com/v2/shop?language=es";
+let products=[],type="Todos";
+function normalize(data){
+ const entries=data?.data?.featured?.entries || data?.data?.entries || [];
+ const out=[];
+ for(const e of entries){
+   const items=e.brItems||e.items||[];
+   const display=e.displayAsset?.url||e.newDisplayAsset?.renderImages?.[0]||"";
+   const name=e.bundle?.name||items[0]?.name||"Oferta de Fortnite";
+   const price=e.finalPrice??e.price??items[0]?.shopHistory?.at(-1)??0;
+   const img=display||items[0]?.images?.featured||items[0]?.images?.icon||items[0]?.images?.smallIcon||"";
+   const kind=e.bundle?"Lote":(items[0]?.type?.displayValue||items[0]?.type?.value||"Cosmético");
+   out.push({name,kind,price:Number(price)||0,img});
+ }
+ // fallback to regular shop entries if featured is unavailable
+ if(!out.length){
+   const all=data?.data?.daily?.entries || data?.data?.entries || [];
+   for(const e of all){
+    const item=(e.brItems||e.items||[])[0]||{};
+    out.push({name:e.bundle?.name||item.name||"Cosmético",kind:item.type?.displayValue||"Cosmético",
+    price:Number(e.finalPrice??e.price??0),img:e.displayAsset?.url||item.images?.featured||item.images?.icon||""});
+   }
+ }
+ return out;
+}
+async function load(){
+ try{
+  const r=await fetch(API); if(!r.ok) throw Error("API");
+  const j=await r.json(); products=normalize(j);
+  if(!products.length) throw Error("Sin productos");
+  document.getElementById("status").textContent=`${products.length} ofertas cargadas · actualización automática de la tienda`;
+  buildFilters(); render();
+ }catch(e){
+  document.getElementById("loading").innerHTML='<div class="error">No se pudo cargar la tienda automática. Comprueba tu conexión o vuelve a abrir la página.</div>';
+  document.getElementById("status").textContent="La API no respondió.";
+ }
+}
+function buildFilters(){
+ const kinds=["Todos",...new Set(products.map(x=>x.kind))].slice(0,10);
+ document.getElementById("filters").innerHTML=kinds.map((x,i)=>`<button class="filter ${i===0?"active":""}" onclick="setType('${x.replaceAll("'","\\'")}',this)">${x}</button>`).join("");
+}
+function setType(x,b){type=x;document.querySelectorAll(".filter").forEach(a=>a.classList.remove("active"));b.classList.add("active");render()}
+function render(){
+ const q=document.getElementById("search").value.toLowerCase();
+ const arr=products.filter(x=>(type==="Todos"||x.kind===type)&&x.name.toLowerCase().includes(q));
+ document.getElementById("loading").style.display="none";
+ document.getElementById("grid").innerHTML=arr.map((p,i)=>`
+ <article class="card"><div class="pic">${p.img?`<img src="${p.img}" loading="lazy" alt="${p.name}">`:`<span class="placeholder">SIN IMAGEN</span>`}</div>
+ <div class="info"><div class="name">${p.name}</div><div class="meta">${p.kind}</div>
+ <div class="vb">${p.price?`Precio Fortnite: ${p.price.toLocaleString()} paVos`:"Precio no disponible"}</div>
+ <div class="price">S/ 10.00</div><button class="buy" onclick='buy(${JSON.stringify(p.name)})'>Comprar</button></div></article>`).join("");
+}
+function buy(name){document.getElementById("mtitle").textContent="Comprar: "+name;document.getElementById("wa").href="https://wa.me/?text="+encodeURIComponent("Hola Crislio Store, quiero comprar: "+name);document.getElementById("modal").style.display="flex"}
+function closeModal(){document.getElementById("modal").style.display="none"}
+document.getElementById("search").addEventListener("input",render);
+load();
+</script>
+</body></html>
